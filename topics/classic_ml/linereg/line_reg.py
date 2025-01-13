@@ -2,11 +2,16 @@ import pandas as pd
 import numpy as np
 
 class MyLineReg:
-    def __init__(self, n_iter=100, learning_rate=0.1, metric=None):
+    def __init__(self, n_iter=100, learning_rate=0.1,
+                 metric=None,
+                 reg=None, l1_coef=0.0, l2_coef=0.0):
         self.n_iter = n_iter
         self.learning_rate = learning_rate
         self.metric_type = metric
         self.weights = None
+        self.reg = reg
+        self.l1_coef = l1_coef
+        self.l2_coef = l2_coef
 
     def __repr__(self):
         return f"MyLineReg class: n_iter={self.n_iter}, learning_rate={self.learning_rate}"
@@ -18,9 +23,9 @@ class MyLineReg:
         for index in range(self.n_iter):
             y_pred = X.values @ self.weights
 
-            # evaluate grad
-            loss = self.evaluate_metric(y, y_pred, 'mse')
-            grad = 2 / X.shape[0] * (y_pred.flatten() - y.values) @ X.values
+            # evaluate grad with regularization
+            loss = self.evaluate_metric(y, y_pred, 'mse') + self.get_regularization(self.weights)
+            grad = (2 / X.shape[0] * (y_pred.flatten() - y.values) @ X.values).reshape(-1, 1) + self.get_regularization_slope(self.weights)
 
             # update grad descent
             self.weights = self.weights - self.learning_rate * grad.reshape(-1, 1)
@@ -60,8 +65,28 @@ class MyLineReg:
     def get_best_score(self):
         return self.best_score
 
+    def get_regularization(self, weights):
+        if self.reg == "l1":
+            return np.sum(np.abs(weights)) * self.l1_coef
+        elif self.reg == "l2":
+            return np.sum(weights ** 2) * self.l2_coef
+        elif self.reg == "elasticnet":
+            return np.sum(np.abs(weights)) * self.l1_coef + np.sum(weights ** 2) * self.l2_coef
+        else:
+            return 0.0
 
-MyLineReg = MyLineReg(metric='r2')
+    def get_regularization_slope(self, weights):
+        if self.reg == "l1":
+            return np.sign(weights) * self.l1_coef
+        elif self.reg == "l2":
+            return 2 * weights * self.l2_coef
+        elif self.reg == "elasticnet":
+            return np.sign(weights) * self.l1_coef + 2 * weights * self.l2_coef
+        else:
+            return 0.0
+
+
+MyLineReg = MyLineReg(metric='r2', reg='elasticnet')
 X = pd.DataFrame(np.random.randint(0, 100, size=(100, 4)))
 Y = pd.Series(np.random.randn(100))
 MyLineReg.fit(X, Y, 10)
