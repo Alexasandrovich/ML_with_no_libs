@@ -2,9 +2,10 @@ import pandas as pd
 import numpy as np
 
 class MyLineReg:
-    def __init__(self, n_iter=100, learning_rate=0.1):
+    def __init__(self, n_iter=100, learning_rate=0.1, metric=None):
         self.n_iter = n_iter
         self.learning_rate = learning_rate
+        self.metric_type = metric
         self.weights = None
 
     def __repr__(self):
@@ -16,11 +17,22 @@ class MyLineReg:
         self.weights = np.ones((feature_size, 1))  # init
         for index in range(self.n_iter):
             y_pred = X.values @ self.weights
-            mse = np.mean((y.values - y_pred.flatten())**2)
+
+            # evaluate grad
+            loss = self.evaluate_metric(y, y_pred, 'mse')
             grad = 2 / X.shape[0] * (y_pred.flatten() - y.values) @ X.values
+
+            # update grad descent
             self.weights = self.weights - self.learning_rate * grad.reshape(-1, 1)
+            y_pred = X.values @ self.weights
+
+            # evaluate current metric
+            self.best_score = self.evaluate_metric(y, y_pred, self.metric_type)  # todo: check bestness
             if verbose and index % verbose == 0:
-                print(f"{'start' if index == 0 else index} | loss: {mse}")
+                if self.metric_type:
+                    print(f"{'start' if index == 0 else index} | loss: {loss} | {self.metric_type}: {self.best_score}")
+                else:
+                    print(f"{'start' if index == 0 else index} | loss: {loss}")
 
     def predict(self, X: pd.DataFrame):
         X.insert(0, '', 1.0)
@@ -29,9 +41,27 @@ class MyLineReg:
     def get_coef(self):
         return self.weights[1:]
 
+    def evaluate_metric(self, y_gt, y_pred, metric_type=None):
+        if metric_type == 'mae':
+            return np.mean(np.abs(y_gt.values - y_pred.flatten()))
+        elif metric_type == 'mse':
+            return np.mean((y_gt.values - y_pred.flatten()) ** 2)
+        elif metric_type == 'rmse':
+            return np.sqrt(np.mean((y_gt.values - y_pred.flatten()) ** 2))
+        elif metric_type == 'mape':
+            return 100 * np.mean(np.abs((y_gt.values - y_pred.flatten()) / y_gt.values))
+        elif metric_type == 'r2':
+            ss_res = np.sum((y_gt.values - y_pred.flatten()) ** 2)
+            ss_tot = np.sum((y_gt.values - np.mean(y_gt.values)) ** 2)
+            return 1 - (ss_res / ss_tot)
+        else:
+            return None
+
+    def get_best_score(self):
+        return self.best_score
 
 
-MyLineReg = MyLineReg()
+MyLineReg = MyLineReg(metric='r2')
 X = pd.DataFrame(np.random.randint(0, 100, size=(100, 4)))
 Y = pd.Series(np.random.randn(100))
 MyLineReg.fit(X, Y, 10)
