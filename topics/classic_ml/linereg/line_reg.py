@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
+import random
 
 class MyLineReg:
     def __init__(self, n_iter=100, learning_rate=0.1,
                  metric=None,
-                 reg=None, l1_coef=0.0, l2_coef=0.0):
+                 reg=None, l1_coef=0.0, l2_coef=0.0,
+                 sgd_sample=None, random_state=42):
         self.n_iter = n_iter
         self.learning_rate = learning_rate
         self.metric_type = metric
@@ -12,6 +14,9 @@ class MyLineReg:
         self.reg = reg
         self.l1_coef = l1_coef
         self.l2_coef = l2_coef
+
+        self.sgd_sample = sgd_sample
+        random.seed(random_state)
 
     def __repr__(self):
         return f"MyLineReg class: n_iter={self.n_iter}, learning_rate={self.learning_rate}"
@@ -21,11 +26,12 @@ class MyLineReg:
         feature_size = X.shape[1]
         self.weights = np.ones((feature_size, 1))  # init
         for index in range(self.n_iter):
-            y_pred = X.values @ self.weights
+            X_sampled, y_sampled = self.get_samples(X, y)
+            y_pred = X_sampled @ self.weights
 
             # evaluate grad with regularization
-            loss = self.evaluate_metric(y, y_pred, 'mse') + self.get_regularization(self.weights)
-            grad = (2 / X.shape[0] * (y_pred.flatten() - y.values) @ X.values).reshape(-1, 1) + self.get_regularization_slope(self.weights)
+            loss = self.evaluate_metric(y_sampled, y_pred, 'mse') + self.get_regularization(self.weights)
+            grad = (2 / X_sampled.shape[0] * (y_pred.flatten() - y_sampled) @ X_sampled).reshape(-1, 1) + self.get_regularization_slope(self.weights)
 
             # update grad descent
             if not isinstance(self.learning_rate, float):
@@ -49,21 +55,33 @@ class MyLineReg:
         X.insert(0, '', 1.0)
         return X.values @ self.weights
 
+    def get_samples(self, X, y):
+        if isinstance(self.sgd_sample, float):
+            samples_count = int(X.shape[0] * self.sgd_sample)
+        elif isinstance(self.sgd_sample, int):
+            samples_count = self.sgd_sample
+        else:  # none
+            samples_count = X.shape[0]
+
+        sample_rows_idx = random.sample(range(X.shape[0]), samples_count)
+        return X.values[sample_rows_idx], y.values[sample_rows_idx]
+
+
     def get_coef(self):
         return self.weights[1:]
 
     def evaluate_metric(self, y_gt, y_pred, metric_type=None):
         if metric_type == 'mae':
-            return np.mean(np.abs(y_gt.values - y_pred.flatten()))
+            return np.mean(np.abs(y_gt - y_pred.flatten()))
         elif metric_type == 'mse':
-            return np.mean((y_gt.values - y_pred.flatten()) ** 2)
+            return np.mean((y_gt - y_pred.flatten()) ** 2)
         elif metric_type == 'rmse':
-            return np.sqrt(np.mean((y_gt.values - y_pred.flatten()) ** 2))
+            return np.sqrt(np.mean((y_gt - y_pred.flatten()) ** 2))
         elif metric_type == 'mape':
-            return 100 * np.mean(np.abs((y_gt.values - y_pred.flatten()) / y_gt.values))
+            return 100 * np.mean(np.abs((y_gt - y_pred.flatten()) / y_gt.values))
         elif metric_type == 'r2':
-            ss_res = np.sum((y_gt.values - y_pred.flatten()) ** 2)
-            ss_tot = np.sum((y_gt.values - np.mean(y_gt.values)) ** 2)
+            ss_res = np.sum((y_gt - y_pred.flatten()) ** 2)
+            ss_tot = np.sum((y_gt - np.mean(y_gt.values)) ** 2)
             return 1 - (ss_res / ss_tot)
         else:
             return None
@@ -92,7 +110,7 @@ class MyLineReg:
             return 0.0
 
 
-MyLineReg = MyLineReg(metric='r2', reg='elasticnet', learning_rate=lambda iter: 0.5 * (0.85 ** iter))
+MyLineReg = MyLineReg(metric='r2', reg='elasticnet', learning_rate=lambda iter: 0.5 * (0.85 ** iter), sgd_sample=5)
 X = pd.DataFrame(np.random.randint(0, 100, size=(100, 4)))
 Y = pd.Series(np.random.randn(100))
 MyLineReg.fit(X, Y, 10)
