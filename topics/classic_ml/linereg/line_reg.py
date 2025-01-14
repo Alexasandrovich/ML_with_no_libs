@@ -28,16 +28,22 @@ class MyLineReg:
             grad = (2 / X.shape[0] * (y_pred.flatten() - y.values) @ X.values).reshape(-1, 1) + self.get_regularization_slope(self.weights)
 
             # update grad descent
-            self.weights = self.weights - self.learning_rate * grad.reshape(-1, 1)
+            if not isinstance(self.learning_rate, float):
+                # got lambda function -> lr calculates dynamically
+                current_learning_rate = self.learning_rate(index + 1)
+            else:
+                current_learning_rate = self.learning_rate
+            self.weights = self.weights - current_learning_rate * grad.reshape(-1, 1)
             y_pred = X.values @ self.weights
 
             # evaluate current metric
             self.best_score = self.evaluate_metric(y, y_pred, self.metric_type)  # todo: check bestness
             if verbose and index % verbose == 0:
+                basic_log = f"{'start' if index == 0 else index} | loss: {loss} | lr: {current_learning_rate}"
                 if self.metric_type:
-                    print(f"{'start' if index == 0 else index} | loss: {loss} | {self.metric_type}: {self.best_score}")
+                    print(f"{basic_log} | {self.metric_type}: {self.best_score}")
                 else:
-                    print(f"{'start' if index == 0 else index} | loss: {loss}")
+                    print(f"{basic_log}")
 
     def predict(self, X: pd.DataFrame):
         X.insert(0, '', 1.0)
@@ -86,7 +92,7 @@ class MyLineReg:
             return 0.0
 
 
-MyLineReg = MyLineReg(metric='r2', reg='elasticnet')
+MyLineReg = MyLineReg(metric='r2', reg='elasticnet', learning_rate=lambda iter: 0.5 * (0.85 ** iter))
 X = pd.DataFrame(np.random.randint(0, 100, size=(100, 4)))
 Y = pd.Series(np.random.randn(100))
 MyLineReg.fit(X, Y, 10)
