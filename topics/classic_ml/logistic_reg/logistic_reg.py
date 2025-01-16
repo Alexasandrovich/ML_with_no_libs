@@ -39,8 +39,8 @@ class MyLogReg:
     def calc_grad(self, y_pred, y_gt):
         return 1 / y_pred.shape[0] * (y_pred.values - y_gt.values.reshape(-1, 1)).T.dot(X.values)
 
-    def get_coeffs(self):
-        return np.mean(self.weights)
+    def get_coef(self):
+        return self.weights
 
 
 def generate_dataset(n_samples=200, n_features=3, random_state=42):
