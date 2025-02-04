@@ -35,6 +35,11 @@ class MySVM:
             loss = self.calc_loss(X, Y)
             self.print_log(step, loss, verbose)
 
+    def predict(self, X: pd.DataFrame):
+        predicts = np.sign(self.weights.T @ X.to_numpy().T + self.b).astype(int)
+        predicts[np.where(predicts == -1)] = 0
+        return predicts.ravel()
+
     def is_correct_classification(self, x, y):
         return y * (self.weights.T @ x + self.b) >= 1
 
@@ -77,5 +82,7 @@ svm.fit(X_test, Y_test, verbose=1)
 weights, bias = svm.get_coef()
 print("Final weights:", weights)
 print("Final bias:", bias)
+predictions = svm.predict(X_test)
+print(str(sum(predictions)))
 
 
